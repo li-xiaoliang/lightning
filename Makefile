@@ -206,6 +206,7 @@ protocol-diagrams: $(patsubst %.script, doc/protocol-%.svg, $(notdir $(wildcard 
 check: test-protocol
 
 include bitcoin/Makefile
+include wire/Makefile
 
 # Keep includes in alpha order.
 check-src-include-order/%: %
