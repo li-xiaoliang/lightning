@@ -2,6 +2,7 @@
 #include "chaintopology.h"
 #include "configdir.h"
 #include "db.h"
+#include "invoice.h"
 #include "irc_announce.h"
 #include "jsonrpc.h"
 #include "lightningd.h"
@@ -358,10 +359,6 @@ static struct lightningd_state *lightningd_state(void)
 	txowatch_hash_init(&dstate->txowatches);
 	list_head_init(&dstate->bitcoin_req);
 	list_head_init(&dstate->wallet);
-	list_head_init(&dstate->unpaid);
-	list_head_init(&dstate->paid);
-	dstate->invoices_completed = 0;
-	list_head_init(&dstate->invoice_waiters);
 	list_head_init(&dstate->addresses);
 	dstate->dev_never_routefail = false;
 	dstate->dev_no_broadcast = false;
@@ -370,6 +367,8 @@ static struct lightningd_state *lightningd_state(void)
 	dstate->reexec = NULL;
 	dstate->external_ip = NULL;
 	dstate->announce = NULL;
+
+	dstate->invoices = invoices_init(dstate);
 	return dstate;
 }
 

@@ -3,6 +3,7 @@
 #include "config.h"
 #include "peer.h"
 
+struct invoices;
 struct lightningd_state;
 
 struct invoice {
@@ -17,16 +18,16 @@ struct invoice {
 #define INVOICE_MAX_LABEL_LEN 128
 
 /* From database */
-void invoice_add(struct lightningd_state *dstate,
+void invoice_add(struct invoices *i,
 		 const struct rval *r,
 		 u64 msatoshi,
 		 const char *label,
 		 u64 complete);
 
-void resolve_invoice(struct lightningd_state *dstate,
-		     struct invoice *invoice);
+void resolve_invoice(struct lightningd_state *dstate, struct invoice *invoice);
 
-struct invoice *find_unpaid(struct lightningd_state *dstate,
+struct invoice *find_unpaid(struct invoices *i,
 			    const struct sha256 *rhash);
 
+struct invoices *invoices_init(struct lightningd_state *dstate);
 #endif /* LIGHTNING_DAEMON_INVOICE_H */
