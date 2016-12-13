@@ -1,0 +1,9 @@
+# These are fatal.
+hsmstatus_init_failed,-100
+hsmstatus_writemsg_failed,-99
+hsmstatus_bad_request,-98
+hsmstatus_fd_failed,-97
+
+# Clients can give a bad request, we close their fd, but no harm done.
+hsmstatus_client_bad_request,1
+hsmstatus_client_bad_request,0,id,8

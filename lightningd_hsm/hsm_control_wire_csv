@@ -1,0 +1,13 @@
+# These both respond with init_response
+hsmctl_init_new,1
+hsmctl_init_load,2
+
+hsmctl_init_response,100
+hsmctl_init_response,0,node_id,33
+
+# ECDH passes an fd, no other response.
+hsmctl_hsmfd_ecdh,3
+hsmctl_hsmfd_ecdh,0,id,8
+
+# Shutdown just results in an exit.
+hsmctl_shutdown,4

@@ -220,6 +220,7 @@ check: test-protocol
 
 include bitcoin/Makefile
 include wire/Makefile
+include lightningd_hsm/Makefile
 
 # Keep includes in alpha order.
 check-src-include-order/%: %
