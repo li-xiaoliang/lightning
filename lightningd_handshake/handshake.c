@@ -143,21 +143,19 @@ static void hkdf_two_keys(struct secret *out1, struct secret *out2,
 	*out2 = okm[1];
 }
 
-static void be64_nonce(unsigned char *npub, u64 nonce)
+static void le64_nonce(unsigned char *npub, u64 nonce)
 {
 	/* BOLT #8:
 	 *
-	 * ...with nonce `n` encoded as a big-endian 96-bit value.
+	 * ...with nonce `n` encoded as a little-endian 96-bit value.
 	 */
-	be64 be_nonce = cpu_to_be64(nonce);
+	le64 le_nonce = cpu_to_le64(nonce);
 
-	BUILD_ASSERT(crypto_aead_chacha20poly1305_ietf_NPUBBYTES >= sizeof(be_nonce));
-	/* Big-endian means copy to end */
-	memcpy(npub + crypto_aead_chacha20poly1305_ietf_NPUBBYTES
-	       - sizeof(be_nonce),
-	       &be_nonce, sizeof(be_nonce));
-	memset(npub, 0,
-	       crypto_aead_chacha20poly1305_ietf_NPUBBYTES - sizeof(be_nonce));
+	BUILD_ASSERT(crypto_aead_chacha20poly1305_ietf_NPUBBYTES >= sizeof(le_nonce));
+	/* Little-endian means copy at stard */
+	memcpy(npub, &le_nonce, sizeof(le_nonce));
+	memset(npub + sizeof(le_nonce), 0,
+	       crypto_aead_chacha20poly1305_ietf_NPUBBYTES - sizeof(le_nonce));
 }
 
 /* BOLT #8:
@@ -165,7 +163,7 @@ static void be64_nonce(unsigned char *npub, u64 nonce)
  *      plaintext)`
  *      * where `encrypt` is an evaluation of `ChaCha20-Poly1305` (IETF
  *	  variant) with the passed arguments, with nonce `n` encoded as
-	  a big-endian 96-bit value.
+	  a little-endian 96-bit value.
  */
 static void encrypt_ad(const struct secret *k, u64 nonce,
 		       const void *additional_data, size_t additional_data_len,
@@ -177,7 +175,7 @@ static void encrypt_ad(const struct secret *k, u64 nonce,
 	int ret;
 
 	assert(outputlen == plaintext_len + crypto_aead_chacha20poly1305_ietf_ABYTES);
-	be64_nonce(npub, nonce);
+	le64_nonce(npub, nonce);
 	BUILD_ASSERT(sizeof(*k) == crypto_aead_chacha20poly1305_ietf_KEYBYTES);
 	status_trace("# encryptWithAD(0x%s, 0x%s, 0x%s, %s%s)",
 		     tal_hexstr(trc, k, sizeof(*k)),
@@ -212,7 +210,7 @@ static bool decrypt(const struct secret *k, u64 nonce,
 
 	assert(outputlen == ciphertext_len - crypto_aead_chacha20poly1305_ietf_ABYTES);
 
-	be64_nonce(npub, nonce);
+	le64_nonce(npub, nonce);
 	BUILD_ASSERT(sizeof(*k) == crypto_aead_chacha20poly1305_ietf_KEYBYTES);
 	status_trace("# decryptWithAD(0x%s, 0x%s, 0x%s, 0x%s)",
 		     tal_hexstr(trc, k, sizeof(*k)),
