@@ -54,10 +54,12 @@ CORE_SRC :=					\
 CORE_OBJS := $(CORE_SRC:.c=.o)
 
 CCAN_OBJS :=					\
+	ccan-asort.o				\
+	ccan-crypto-hmac.o			\
+	ccan-crypto-hkdf.o			\
 	ccan-crypto-ripemd160.o			\
 	ccan-crypto-sha256.o			\
 	ccan-crypto-shachain.o			\
-	ccan-asort.o				\
 	ccan-crypto-siphash24.o			\
 	ccan-err.o				\
 	ccan-htable.o				\
@@ -97,6 +99,8 @@ CCAN_HEADERS :=						\
 	$(CCANDIR)/ccan/compiler/compiler.h		\
 	$(CCANDIR)/ccan/container_of/container_of.h	\
 	$(CCANDIR)/ccan/cppmagic/cppmagic.h		\
+	$(CCANDIR)/ccan/crypto/hkdf_sha256/hkdf_sha256.h \
+	$(CCANDIR)/ccan/crypto/hmac_sha256/hmac_sha256.h \
 	$(CCANDIR)/ccan/crypto/ripemd160/ripemd160.h	\
 	$(CCANDIR)/ccan/crypto/sha256/sha256.h		\
 	$(CCANDIR)/ccan/crypto/shachain/shachain.h	\
@@ -385,6 +389,10 @@ ccan-err.o: $(CCANDIR)/ccan/err/err.c
 ccan-noerr.o: $(CCANDIR)/ccan/noerr/noerr.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-str-hex.o: $(CCANDIR)/ccan/str/hex/hex.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-crypto-hmac.o: $(CCANDIR)/ccan/crypto/hmac_sha256/hmac_sha256.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-crypto-hkdf.o: $(CCANDIR)/ccan/crypto/hkdf_sha256/hkdf_sha256.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-crypto-shachain.o: $(CCANDIR)/ccan/crypto/shachain/shachain.c
 	$(CC) $(CFLAGS) -c -o $@ $<
