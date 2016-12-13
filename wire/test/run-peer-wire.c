@@ -70,7 +70,8 @@ static inline bool eq_skip_(const void *p1, const void *p2,
 static bool channel_announcement_eq(const struct msg_channel_announcement *a,
 				    const struct msg_channel_announcement *b)
 {
-	return structeq(a, b);
+	return eq_with(a, b, len)
+		&& eq_var(a, b, len, features);
 }
 
 static bool funding_locked_eq(const struct msg_funding_locked *a,
@@ -184,8 +185,9 @@ static bool node_announcement_eq(const struct msg_node_announcement *a,
 				 const struct msg_node_announcement *b)
 {
 	return eq_with(a, b, port)
-		&& eq_between(a, b, node_id, pad)
-		&& eq_field(a, b, alias);
+		&& eq_between(a, b, node_id, alias)
+		&& eq_field(a, b, len)
+		&& eq_var(a, b, len, features);
 }
 
 /* Try flipping each bit, try running short. */
@@ -231,6 +233,9 @@ int main(void)
 						 | SECP256K1_CONTEXT_SIGN);
 
 	memset(&ca, 2, sizeof(ca));
+	ca.len = 2;
+	ca.features = tal_arr(ctx, u8, 2);
+	memset(ca.features, 2, 2);
 	set_pubkey(&ca.node_id_1);
 	set_pubkey(&ca.node_id_2);
 	set_pubkey(&ca.bitcoin_key_1);
@@ -418,6 +423,9 @@ int main(void)
 	test_corruption(&uah, uah2, update_add_htlc);
 
 	memset(&na, 2, sizeof(na));
+	na.len = 2;
+	na.features = tal_arr(ctx, u8, 2);
+	memset(na.features, 2, 2);
 	set_pubkey(&na.node_id);
 
 	msg = towire_node_announcement(ctx, &na);
