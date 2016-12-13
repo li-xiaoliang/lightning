@@ -4,10 +4,11 @@
 wire-wrongdir:
 	$(MAKE) -C .. wire-all
 
-WIRE_HEADERS := wire/wire.h
+WIRE_HEADERS := wire/wire.h wire/wire_sync.h
 WIRE_GEN_HEADERS := wire/gen_peer_wire.h
 WIRE_GEN_SRC := wire/gen_peer_wire.c
-WIRE_SRC := wire/fromwire.c	\
+WIRE_SRC := wire/wire_sync.c			\
+		wire/fromwire.c			\
 		wire/towire.c
 
 WIRE_OBJS := $(WIRE_SRC:.c=.o) $(WIRE_GEN_SRC:.c=.o)
