@@ -387,7 +387,7 @@ static bool committed_to_htlcs(const struct peer *peer)
 
 static void peer_calculate_close_fee(struct peer *peer)
 {
-	/* Use actual worst-case length of close tx: based on BOLT#02's
+	/* Use actual worst-case length of close tx: based on FIXME-OLD#02's
 	 * commitment tx numbers, but only 1 byte for output count */
 	const uint64_t txsize = 41 + 221 + 10 + 32 + 32;
 	uint64_t maxfee;
@@ -395,7 +395,7 @@ static void peer_calculate_close_fee(struct peer *peer)
 	peer->closing.our_fee
 		= fee_by_feerate(txsize, get_feerate(peer->dstate));
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 * The sender MUST set `close_fee` lower than or equal to the
 	 * fee of the final commitment transaction, and MUST set
 	 * `close_fee` to an even number of satoshis.
@@ -491,7 +491,7 @@ static bool peer_received_unexpected_pkt(struct peer *peer, const Pkt *pkt,
 	}
 	log_unusual(peer->log, "Error pkt '%s'", pkt->error->problem);
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node MUST fail the connection if it receives an `err`
 	 * message, and MUST NOT send an `err` message in this case.
@@ -1167,7 +1167,7 @@ static const char *changestates(struct peer *peer,
 		changed = true;
 	}
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node MUST NOT send an `update_commit` message which does
 	 * not include any updates.
@@ -1192,7 +1192,7 @@ static bool closing_pkt_in(struct peer *peer, const Pkt *pkt)
 	log_info(peer->log, "closing_pkt_in: they offered close fee %"PRIu64,
 		 c->close_fee);
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * The sender MUST set `close_fee` lower than or equal to the fee of the
 	 * final commitment transaction, and MUST set `close_fee` to an even
@@ -1206,7 +1206,7 @@ static bool closing_pkt_in(struct peer *peer, const Pkt *pkt)
 
 	/* FIXME: Don't accept tiny fee at all? */
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	   ... otherwise it SHOULD propose a
 	   value strictly between the received `close_fee` and its
 	   previously-sent `close_fee`.
@@ -1224,7 +1224,7 @@ static bool closing_pkt_in(struct peer *peer, const Pkt *pkt)
 		}
 	}
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * The receiver MUST check `sig` is valid for the close
 	 * transaction with the given `close_fee`, and MUST fail the
@@ -1252,7 +1252,7 @@ static bool closing_pkt_in(struct peer *peer, const Pkt *pkt)
 		return peer_database_err(peer);
 
 	if (peer->closing.our_fee != peer->closing.their_fee) {
-		/* BOLT #2:
+		/* FIXME-OLD #2:
 		 *
 		 * If the receiver agrees with the fee, it SHOULD reply with a
 		 * `close_signature` with the same `close_fee` value,
@@ -1287,7 +1287,7 @@ static bool closing_pkt_in(struct peer *peer, const Pkt *pkt)
 	if (peer->closing.our_fee == peer->closing.their_fee) {
 		const struct bitcoin_tx *close;
 		log_info(peer->log, "accept_pkt_close_sig: we agree");
-		/* BOLT #2:
+		/* FIXME-OLD #2:
 		 *
 		 * Once a node has sent or received a `close_signature` with
 		 * matching `close_fee` it SHOULD close the connection and
@@ -1336,7 +1336,7 @@ static Pkt *handle_pkt_commit(struct peer *peer, const Pkt *pkt)
 
 	db_start_transaction(peer);
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node MUST NOT send an `update_commit` message which does
 	 * not include any updates.
@@ -1353,7 +1353,7 @@ static Pkt *handle_pkt_commit(struct peer *peer, const Pkt *pkt)
 	/* Create new commit info for this commit tx. */
 	ci->revocation_hash = peer->local.next_revocation_hash;
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A receiving node MUST apply all local acked and unacked
 	 * changes except unacked fee changes to the local commitment
@@ -1368,7 +1368,7 @@ static Pkt *handle_pkt_commit(struct peer *peer, const Pkt *pkt)
 	log_add_struct(peer->log, " for %s", struct channel_state, ci->cstate);
 	log_add_struct(peer->log, " (txid %s)", struct sha256_double, &ci->txid);
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * If the commitment transaction has only a single output which pays
 	 * to the other node, `sig` MUST be unset.  Otherwise, a sending node
@@ -1382,7 +1382,7 @@ static Pkt *handle_pkt_commit(struct peer *peer, const Pkt *pkt)
 	if (err)
 		return err;
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A receiving node MUST apply all local acked and unacked changes
 	 * except unacked fee changes to the local commitment, then it MUST
@@ -1453,7 +1453,7 @@ static Pkt *handle_pkt_htlc_add(struct peer *peer, const Pkt *pkt)
 		return err;
 	assert(htlc->state == RCVD_ADD_HTLC);
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node MUST NOT offer `amount_msat` it cannot pay for in
 	 * the remote commitment transaction at the current `fee_rate` (see
@@ -1499,7 +1499,7 @@ static Pkt *handle_pkt_htlc_fail(struct peer *peer, const Pkt *pkt)
 
 	cstate_fail_htlc(peer->local.staging_cstate, htlc);
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * ... and the receiving node MUST add the HTLC fulfill/fail
 	 * to the unacked changeset for its local commitment.
@@ -1529,7 +1529,7 @@ static Pkt *handle_pkt_htlc_fulfill(struct peer *peer, const Pkt *pkt)
 			return pkt_err(peer, "database error");
 	}
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * ... and the receiving node MUST add the HTLC fulfill/fail
 	 * to the unacked changeset for its local commitment.
@@ -1563,7 +1563,7 @@ static Pkt *handle_pkt_feechange(struct peer *peer, const Pkt *pkt)
 	if (err)
 		return err;
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * The sending node MUST NOT send a `fee_rate` which it could not
 	 * afford (see "Fee Calculation), were it applied to the receiving
@@ -1598,7 +1598,7 @@ static Pkt *handle_pkt_revocation(struct peer *peer, const Pkt *pkt,
 	if (err)
 		return err;
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * The receiver of `update_revocation`... MUST add the remote
 	 * unacked changes to the set of local acked changes.
@@ -1647,7 +1647,7 @@ static bool shutdown_pkt_in(struct peer *peer, const Pkt *pkt)
 		break;
 
 	case PKT__PKT_UPDATE_ADD_HTLC:
-		/* BOLT #2:
+		/* FIXME-OLD #2:
 		 *
 		 * A node MUST NOT send a `update_add_htlc` after a
 		 * `close_shutdown` */
@@ -1658,7 +1658,7 @@ static bool shutdown_pkt_in(struct peer *peer, const Pkt *pkt)
 		break;
 
 	case PKT__PKT_CLOSE_SHUTDOWN:
-		/* BOLT #2:
+		/* FIXME-OLD #2:
 		 *
 		 * A node... MUST NOT send more than one `close_shutdown`. */
 		if (peer->closing.their_script)
@@ -1757,7 +1757,7 @@ static bool do_commit(struct peer *peer, struct command *jsoncmd)
 
 	/* Create new commit info for this commit tx. */
 	ci->revocation_hash = peer->remote.next_revocation_hash;
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * ...a sending node MUST apply all remote acked and unacked
 	 * changes except unacked fee changes to the remote commitment
@@ -1828,7 +1828,7 @@ static bool peer_start_shutdown(struct peer *peer)
 	peer->closing.our_script = scriptpubkey_p2sh(peer, redeemscript);
 	tal_free(redeemscript);
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node SHOULD send a `close_shutdown` (if it has
 	 * not already) after receiving `close_shutdown`.
@@ -1981,7 +1981,7 @@ static bool command_htlc_fail(struct peer *peer, struct htlc *htlc)
 	if (!state_can_remove_htlc(peer->state))
 		return false;
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * The sending node MUST add the HTLC fulfill/fail to the
 	 * unacked changeset for its remote commitment
@@ -1996,7 +1996,7 @@ static bool command_htlc_fail(struct peer *peer, struct htlc *htlc)
 	return true;
 }
 
-/* BOLT #onchain:
+/* FIXME-OLD #onchain:
  *
  * If the node receives... a redemption preimage for an unresolved *commitment
  * tx* output it was offered, it MUST *resolve* the output by spending it using
@@ -2030,7 +2030,7 @@ static bool command_htlc_fulfill(struct peer *peer, struct htlc *htlc)
 	if (!state_can_remove_htlc(peer->state))
 		return false;
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * The sending node MUST add the HTLC fulfill/fail to the
 	 * unacked changeset for its remote commitment
@@ -2075,7 +2075,7 @@ const char *command_htlc_add(struct peer *peer, u64 msatoshi,
 		return "expiry too far";
 	}
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node MUST NOT add a HTLC if it would result in it
 	 * offering more than 300 HTLCs in the remote commitment transaction.
@@ -2097,13 +2097,13 @@ const char *command_htlc_add(struct peer *peer, u64 msatoshi,
 			      msatoshi, rhash, expiry, route, tal_count(route),
 			      src, SENT_ADD_HTLC);
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * The sending node MUST add the HTLC addition to the unacked
 	 * changeset for its remote commitment
 	 */
 	if (!cstate_add_htlc(peer->remote.staging_cstate, *htlc, true)) {
-		/* BOLT #2:
+		/* FIXME-OLD #2:
 		 *
 		 * A node MUST NOT offer `amount_msat` it cannot pay for in
 		 * the remote commitment transaction at the current `fee_rate`
@@ -2204,7 +2204,7 @@ static void retransmit_updates(struct peer *peer)
 	struct htlc_map_iter it;
 	struct htlc *h;
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node MAY simply retransmit messages which are identical to the
 	 * previous transmission. */
@@ -2233,7 +2233,7 @@ static void retransmit_updates(struct peer *peer)
 	assert(!peer->feechanges[SENT_FEECHANGE]);
 }
 
-/* BOLT #2:
+/* FIXME-OLD #2:
  *
  * On disconnection, a node MUST reverse any uncommitted changes sent by the
  * other side (ie. `update_add_htlc`, `update_fee`, `update_fail_htlc` and
@@ -2338,7 +2338,7 @@ static void retransmit_pkts(struct peer *peer, s64 ack)
 		  ack, peer->remote.commit ? peer->remote.commit->order : -2,
 		  peer->local.commit ? peer->local.commit->order : -2);
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node MAY assume that only one of each type of message need be
 	 * retransmitted.  A node SHOULD retransmit the last of each message
@@ -2351,7 +2351,7 @@ static void retransmit_pkts(struct peer *peer, s64 ack)
 			queue_pkt_open_commit_sig(peer);
 		} else if (peer->remote.commit
 			   && ack == peer->remote.commit->order) {
-			/* BOLT #2:
+			/* FIXME-OLD #2:
 			 *
 			 * Before retransmitting `update_commit`, the node
 			 * MUST send appropriate `update_add_htlc`,
@@ -2447,7 +2447,7 @@ static struct io_plan *init_pkt_in(struct io_conn *conn, struct peer *peer)
 	if (peer->inpkt->init->has_features) {
 		size_t i;
 
-		/* BOLT #2:
+		/* FIXME-OLD #2:
 		 *
 		 * The receiving node SHOULD ignore any odd feature bits it
 		 * does not support, and MUST fail the connection if any
@@ -2526,7 +2526,7 @@ static struct io_plan *peer_send_init(struct io_conn *conn, struct peer *peer)
 		  PRIu64" revokes + %"PRIu64" shutdown + %"PRIu64" closing",
 		  open, sigs, revokes, shutdown, closing);
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node MUST send an `init` message immediately immediately after
 	 * it has validated the `authenticate` message.  A node MUST set
@@ -2943,7 +2943,7 @@ static struct io_plan *crypto_on_in(struct io_conn *conn,
 {
 	struct peer *peer;
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node MUST handle continuing a previous channel on a new encrypted
 	 * transport. */
@@ -3238,7 +3238,7 @@ static void check_htlc_expiry(struct peer *peer)
 		}
 	}
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node MUST NOT offer a HTLC after this deadline, and MUST
 	 * fail the connection if an HTLC which it offered is in
@@ -3315,7 +3315,7 @@ static enum watch_result anchor_depthchange(struct peer *peer,
 		remote_changes_pending(peer);
 	}
 
-	/* BOLT #2:
+	/* FIXME-OLD #2:
 	 *
 	 * A node MUST update bitcoin fees if it estimates that the
 	 * current commitment transaction will not be processed in a
@@ -3576,7 +3576,7 @@ static enum watch_result our_htlc_depth(struct peer *peer,
 
 	height = get_block_height(peer->dstate);
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * If the *commitment tx* is the other node's, the output is
 	 * considered *timed out* once the HTLC is expired.  If the
@@ -3592,7 +3592,7 @@ static enum watch_result our_htlc_depth(struct peer *peer,
 			return KEEP_WATCHING;
 	}
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * If the output has *timed out* and not been *resolved*, the node
 	 * MUST *resolve* the output by spending it.
@@ -3639,7 +3639,7 @@ static enum watch_result their_htlc_depth(struct peer *peer,
 
 	height = get_block_height(peer->dstate);
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * Otherwise, if the output HTLC has expired, it is considered
 	 * *irrevocably resolved*.
@@ -3662,7 +3662,7 @@ static enum watch_result our_main_output_depth(struct peer *peer,
 
 	assert(peer->onchain.to_us_idx != -1);
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * 1. _A's main output_: A node SHOULD spend this output to a
 	 *    convenient address.  This avoids having to remember the
@@ -3714,7 +3714,7 @@ static enum watch_result our_htlc_spent(struct peer *peer,
 	struct sha256 sha;
 	struct rval preimage;
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * If a node sees a redemption transaction...the node MUST extract the
 	 * preimage from the transaction input witness.  This is either to
@@ -3748,7 +3748,7 @@ static enum watch_result our_htlc_spent(struct peer *peer,
 	set_htlc_rval(peer, h, &preimage);
 	our_htlc_fulfilled(peer, h);
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * If a node sees a redemption transaction, the output is considered
 	 * *irrevocably resolved*... Note that we don't care about the fate of
@@ -3767,7 +3767,7 @@ static void resolve_our_htlc(struct peer *peer,
 						     const struct sha256_double*,
 						     ptrint_t *out_num))
 {
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * A node MUST watch for spends of *commitment tx* outputs for HTLCs
 	 * it offered; each one must be *resolved* by a timeout transaction
@@ -3782,7 +3782,7 @@ static void resolve_our_htlc(struct peer *peer,
 
 static void resolve_their_htlc(struct peer *peer, unsigned int out_num)
 {
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * If the node ... already knows... a redemption preimage for an
 	 * unresolved *commitment tx* output it was offered, it MUST *resolve*
@@ -3792,7 +3792,7 @@ static void resolve_their_htlc(struct peer *peer, unsigned int out_num)
 		peer->onchain.resolved[out_num]	= htlc_fulfill_tx(peer, out_num);
 		broadcast_tx(peer, peer->onchain.resolved[out_num], NULL);
 	} else {
-		/* BOLT #onchain:
+		/* FIXME-OLD #onchain:
 		 *
 		 * Otherwise, if the output HTLC has expired, it is considered
 		 * *irrevocably resolved*.
@@ -3802,7 +3802,7 @@ static void resolve_their_htlc(struct peer *peer, unsigned int out_num)
 	}
 }
 
-/* BOLT #onchain:
+/* FIXME-OLD #onchain:
  *
  * When node A sees its own *commitment tx*:
  */
@@ -3817,7 +3817,7 @@ static void resolve_our_unilateral(struct peer *peer)
 	watch_tx(tx, peer, tx, our_unilateral_depth, NULL);
 
 	for (i = 0; i < tx->output_count; i++) {
-		/* BOLT #onchain:
+		/* FIXME-OLD #onchain:
 		 *
 		 * 1. _A's main output_: A node SHOULD spend this output to a
 		 *    convenient address. ... A node MUST wait until the
@@ -3828,7 +3828,7 @@ static void resolve_our_unilateral(struct peer *peer)
 		if (i == peer->onchain.to_us_idx)
 			watch_tx(tx, peer, tx, our_main_output_depth, NULL);
 
-		/* BOLT #onchain:
+		/* FIXME-OLD #onchain:
 		 *
 		 * 2. _B's main output_: No action required, this output is
 		 *    considered *resolved* by the *commitment tx*.
@@ -3836,7 +3836,7 @@ static void resolve_our_unilateral(struct peer *peer)
 		else if (i == peer->onchain.to_them_idx)
 			peer->onchain.resolved[i] = tx;
 
-		/* BOLT #onchain:
+		/* FIXME-OLD #onchain:
 		 *
 		 * 3. _A's offered HTLCs_: See On-chain HTLC Handling: Our
 		 *    Offers below.
@@ -3844,7 +3844,7 @@ static void resolve_our_unilateral(struct peer *peer)
 		else if (htlc_owner(peer->onchain.htlcs[i]) == LOCAL)
 			resolve_our_htlc(peer, i, our_htlc_depth_ourcommit);
 
-		/* BOLT #onchain:
+		/* FIXME-OLD #onchain:
 		 *
 		 * 4. _B's offered HTLCs_: See On-chain HTLC Handling: Their
 		 *    Offers below.
@@ -3854,7 +3854,7 @@ static void resolve_our_unilateral(struct peer *peer)
 	}
 }
 
-/* BOLT #onchain:
+/* FIXME-OLD #onchain:
  *
  * Similarly, when node A sees a *commitment tx* from B:
  */
@@ -3864,7 +3864,7 @@ static void resolve_their_unilateral(struct peer *peer)
 	const struct bitcoin_tx *tx = peer->onchain.tx;
 
 	for (i = 0; i < tx->output_count; i++) {
-		/* BOLT #onchain:
+		/* FIXME-OLD #onchain:
 		 *
 		 * 1. _A's main output_: No action is required; this is a
 		 *    simple P2WPKH output.  This output is considered
@@ -3872,14 +3872,14 @@ static void resolve_their_unilateral(struct peer *peer)
 		 */
 		if (i == peer->onchain.to_us_idx)
 			peer->onchain.resolved[i] = tx;
-		/* BOLT #onchain:
+		/* FIXME-OLD #onchain:
 		 *
 		 * 2. _B's main output_: No action required, this output is
 		 *    considered *resolved* by the *commitment tx*.
 		 */
 		else if (i == peer->onchain.to_them_idx)
 			peer->onchain.resolved[i] = tx;
-		/* BOLT #onchain:
+		/* FIXME-OLD #onchain:
 		 *
 		 * 3. _A's offered HTLCs_: See On-chain HTLC Handling: Our
 		 * Offers below.
@@ -3899,10 +3899,10 @@ static void resolve_mutual_close(struct peer *peer)
 {
 	unsigned int i;
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * A node doesn't need to do anything else as it has already agreed to
-	 * the output, which is sent to its specified scriptpubkey (see BOLT
+	 * the output, which is sent to its specified scriptpubkey (see FIXME-OLD
 	 * #2 "4.1: Closing initiation: close_shutdown").
 	 */
 	for (i = 0; i < peer->onchain.tx->output_count; i++)
@@ -3923,7 +3923,7 @@ static enum watch_result check_for_resolution(struct peer *peer,
 	size_t i, n = tal_count(peer->onchain.resolved);
 	size_t forever = peer->dstate->config.forever_confirms;
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * A node MUST *resolve* all outputs as specified below, and MUST be
 	 * prepared to resolve them multiple times in case of blockchain
@@ -3933,7 +3933,7 @@ static enum watch_result check_for_resolution(struct peer *peer,
 		if (!peer->onchain.resolved[i])
 			return KEEP_WATCHING;
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * Outputs which are *resolved* by a transaction are considered
 	 * *irrevocably resolved* once they are included in a block at least
@@ -3950,7 +3950,7 @@ static enum watch_result check_for_resolution(struct peer *peer,
 			return KEEP_WATCHING;
 	}
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * A node MUST monitor the blockchain for transactions which spend any
 	 * output which is not *irrevocably resolved* until all outputs are
@@ -4004,7 +4004,7 @@ static void resolve_their_steal(struct peer *peer,
 
 	log_debug(peer->log, "Analyzing tx to steal:");
 	for (i = 0; i < tx->output_count; i++) {
-		/* BOLT #onchain:
+		/* FIXME-OLD #onchain:
 		 * 1. _A's main output_: No action is required; this is a
 		 *    simple P2WPKH output.  This output is considered
 		 *    *resolved* by the *commitment tx*.
@@ -4015,7 +4015,7 @@ static void resolve_their_steal(struct peer *peer,
 			continue;
 		}
 
-		/* BOLT #onchain:
+		/* FIXME-OLD #onchain:
 		 *
 		 * 2. _B's main output_: The node MUST *resolve* this by
 		 * spending using the revocation preimage.
@@ -4200,7 +4200,7 @@ static enum watch_result anchor_spent(struct peer *peer,
 		goto unknown_spend;
 	}
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * A node MAY send a descriptive error packet in this case.
 	 */
@@ -4213,7 +4213,7 @@ static enum watch_result anchor_spent(struct peer *peer,
 	/* If we've just closed connection, make output close it. */
 	io_wake(peer);
 
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * A node SHOULD fail the connection if it is not already
 	 * closed when it sees the funding transaction spent.
@@ -4226,7 +4226,7 @@ static enum watch_result anchor_spent(struct peer *peer,
 	return KEEP_WATCHING;
 
 unknown_spend:
-	/* BOLT #onchain:
+	/* FIXME-OLD #onchain:
 	 *
 	 * A node SHOULD report an error to the operator if it
 	 * sees a transaction spend the funding transaction
