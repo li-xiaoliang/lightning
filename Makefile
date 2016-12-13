@@ -62,6 +62,7 @@ CCAN_OBJS :=					\
 	ccan-crypto-shachain.o			\
 	ccan-crypto-siphash24.o			\
 	ccan-err.o				\
+	ccan-fdpass.o				\
 	ccan-htable.o				\
 	ccan-ilog.o				\
 	ccan-io-io.o				\
@@ -107,6 +108,7 @@ CCAN_HEADERS :=						\
 	$(CCANDIR)/ccan/crypto/siphash24/siphash24.h	\
 	$(CCANDIR)/ccan/endian/endian.h			\
 	$(CCANDIR)/ccan/err/err.h			\
+	$(CCANDIR)/ccan/fdpass/fdpass.h			\
 	$(CCANDIR)/ccan/htable/htable.h			\
 	$(CCANDIR)/ccan/htable/htable_type.h		\
 	$(CCANDIR)/ccan/ilog/ilog.h			\
@@ -425,4 +427,6 @@ ccan-io-poll.o: $(CCANDIR)/ccan/io/poll.c
 ccan-pipecmd.o: $(CCANDIR)/ccan/pipecmd/pipecmd.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-mem.o: $(CCANDIR)/ccan/mem/mem.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-fdpass.o: $(CCANDIR)/ccan/fdpass/fdpass.c
 	$(CC) $(CFLAGS) -c -o $@ $<
