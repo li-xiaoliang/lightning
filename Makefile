@@ -1,86 +1,67 @@
 #! /usr/bin/make
-NAME=Bitcoin Savings & Trust Daily Interest II
-
-# Needs to have oneof support: Ubuntu vivid's is too old :(
-PROTOCC:=protoc-c
+VERSION_NAME=I Accidentally The Smart Contract
+VERSION=$(shell git describe --always --dirty=-modded --abbrev=7)
+DISTRO=$(shell lsb_release -is 2>/dev/null || echo unknown)-$(shell lsb_release -rs 2>/dev/null || echo unknown)
+PKGNAME = c-lightning
 
 # We use our own internal ccan copy.
 CCANDIR := ccan
 
 # Where we keep the BOLT RFCs
 BOLTDIR := ../lightning-rfc/
-BOLTVERSION := master
+BOLTVERSION := fd9da9b95eb5d585252d7e749212151502e0cc17
 
-# If you don't have (working) valgrind.
-#NO_VALGRIND := 1
+-include config.vars
 
-ifneq ($(NO_VALGRIND),1)
-VALGRIND=valgrind -q --error-exitcode=7
-VALGRIND_TEST_ARGS = --track-origins=yes --leak-check=full --show-reachable=yes
+ifneq ($(VALGRIND),0)
+VG=valgrind -q --error-exitcode=7
+VG_TEST_ARGS = --track-origins=yes --leak-check=full --show-reachable=yes --errors-for-leak-kinds=all
+endif
+
+ifeq ($(DEVELOPER),1)
+DEV_CFLAGS=-DCCAN_TAKE_DEBUG=1 -DCCAN_TAL_DEBUG=1
+else
+DEV_CFLAGS=
 endif
 
 ifeq ($(COVERAGE),1)
 COVFLAGS = --coverage
 endif
 
+ifeq ($(PIE),1)
+PIE_CFLAGS=-fPIE -fPIC
+PIE_LDFLAGS=-pie
+endif
+
+ifeq ($(COMPAT),1)
+# We support compatibility with pre-0.6.
+COMPAT_CFLAGS=-DCOMPAT_V052=1
+endif
+
+PYTEST_OPTS := -v -x
+
 # This is where we add new features as bitcoin adds them.
 FEATURES :=
-
-TEST_PROGRAMS :=				\
-	test/test_protocol			\
-	test/test_sphinx
-
-BITCOIN_SRC :=					\
-	bitcoin/base58.c			\
-	bitcoin/block.c			\
-	bitcoin/locktime.c			\
-	bitcoin/pubkey.c			\
-	bitcoin/pullpush.c			\
-	bitcoin/script.c			\
-	bitcoin/shadouble.c			\
-	bitcoin/signature.c			\
-	bitcoin/tx.c				\
-	bitcoin/varint.c
-
-BITCOIN_OBJS := $(BITCOIN_SRC:.c=.o)
-
-CORE_SRC :=					\
-	opt_bits.c				\
-	status.c				\
-	type_to_string.c			\
-	utils.c					\
-	version.c
-
-CORE_OBJS := $(CORE_SRC:.c=.o)
-
-CORE_TX_SRC :=					\
-	close_tx.c				\
-	find_p2sh_out.c				\
-	permute_tx.c
-
-CORE_TX_OBJS := $(CORE_TX_SRC:.c=.o)
-
-CORE_PROTOBUF_SRC :=				\
-	lightning.pb-c.c			\
-	protobuf_convert.c
-
-CORE_PROTOBUF_OBJS := $(CORE_PROTOBUF_SRC:.c=.o)
 
 CCAN_OBJS :=					\
 	ccan-asort.o				\
 	ccan-autodata.o				\
+	ccan-bitops.o				\
 	ccan-breakpoint.o			\
+	ccan-crc.o				\
 	ccan-crypto-hmac.o			\
 	ccan-crypto-hkdf.o			\
 	ccan-crypto-ripemd160.o			\
 	ccan-crypto-sha256.o			\
 	ccan-crypto-shachain.o			\
 	ccan-crypto-siphash24.o			\
+	ccan-daemonize.o			\
 	ccan-err.o				\
 	ccan-fdpass.o				\
 	ccan-htable.o				\
 	ccan-ilog.o				\
 	ccan-io-io.o				\
+	ccan-intmap.o				\
 	ccan-io-poll.o				\
 	ccan-io-fdpass.o			\
 	ccan-isaac.o				\
@@ -93,16 +74,21 @@ CCAN_OBJS :=					\
 	ccan-opt-usage.o			\
 	ccan-opt.o				\
 	ccan-pipecmd.o				\
+	ccan-ptr_valid.o			\
+	ccan-rbuf.o				\
 	ccan-read_write_all.o			\
+	ccan-str-base32.o			\
 	ccan-str-hex.o				\
 	ccan-str.o				\
 	ccan-take.o				\
 	ccan-tal-grab_file.o			\
+	ccan-tal-link.o				\
 	ccan-tal-path.o				\
 	ccan-tal-str.o				\
 	ccan-tal.o				\
 	ccan-time.o				\
-	ccan-timer.o
+	ccan-timer.o				\
+	ccan-utf8.o
 
 CCAN_HEADERS :=						\
 	$(CCANDIR)/config.h				\
@@ -110,6 +96,7 @@ CCAN_HEADERS :=						\
 	$(CCANDIR)/ccan/array_size/array_size.h		\
 	$(CCANDIR)/ccan/asort/asort.h			\
 	$(CCANDIR)/ccan/autodata/autodata.h		\
+	$(CCANDIR)/ccan/bitops/bitops.h			\
 	$(CCANDIR)/ccan/breakpoint/breakpoint.h		\
 	$(CCANDIR)/ccan/build_assert/build_assert.h	\
 	$(CCANDIR)/ccan/cast/cast.h			\
@@ -118,18 +105,21 @@ CCAN_HEADERS :=						\
 	$(CCANDIR)/ccan/compiler/compiler.h		\
 	$(CCANDIR)/ccan/container_of/container_of.h	\
 	$(CCANDIR)/ccan/cppmagic/cppmagic.h		\
+	$(CCANDIR)/ccan/crc/crc.h			\
 	$(CCANDIR)/ccan/crypto/hkdf_sha256/hkdf_sha256.h \
 	$(CCANDIR)/ccan/crypto/hmac_sha256/hmac_sha256.h \
 	$(CCANDIR)/ccan/crypto/ripemd160/ripemd160.h	\
 	$(CCANDIR)/ccan/crypto/sha256/sha256.h		\
 	$(CCANDIR)/ccan/crypto/shachain/shachain.h	\
 	$(CCANDIR)/ccan/crypto/siphash24/siphash24.h	\
+	$(CCANDIR)/ccan/daemonize/daemonize.h		\
 	$(CCANDIR)/ccan/endian/endian.h			\
 	$(CCANDIR)/ccan/err/err.h			\
 	$(CCANDIR)/ccan/fdpass/fdpass.h			\
 	$(CCANDIR)/ccan/htable/htable.h			\
 	$(CCANDIR)/ccan/htable/htable_type.h		\
 	$(CCANDIR)/ccan/ilog/ilog.h			\
+	$(CCANDIR)/ccan/intmap/intmap.h			\
 	$(CCANDIR)/ccan/io/backend.h			\
 	$(CCANDIR)/ccan/io/fdpass/fdpass.h		\
 	$(CCANDIR)/ccan/io/io.h				\
@@ -146,8 +136,10 @@ CCAN_HEADERS :=						\
 	$(CCANDIR)/ccan/pipecmd/pipecmd.h		\
 	$(CCANDIR)/ccan/ptr_valid/ptr_valid.h		\
 	$(CCANDIR)/ccan/ptrint/ptrint.h			\
+	$(CCANDIR)/ccan/rbuf/rbuf.h			\
 	$(CCANDIR)/ccan/read_write_all/read_write_all.h	\
 	$(CCANDIR)/ccan/short_types/short_types.h	\
+	$(CCANDIR)/ccan/str/base32/base32.h		\
 	$(CCANDIR)/ccan/str/hex/hex.h			\
 	$(CCANDIR)/ccan/str/str.h			\
 	$(CCANDIR)/ccan/str/str_debug.h			\
@@ -155,94 +147,81 @@ CCAN_HEADERS :=						\
 	$(CCANDIR)/ccan/structeq/structeq.h		\
 	$(CCANDIR)/ccan/take/take.h			\
 	$(CCANDIR)/ccan/tal/grab_file/grab_file.h	\
+	$(CCANDIR)/ccan/tal/link/link.h			\
 	$(CCANDIR)/ccan/tal/path/path.h			\
 	$(CCANDIR)/ccan/tal/str/str.h			\
 	$(CCANDIR)/ccan/tal/tal.h			\
 	$(CCANDIR)/ccan/tcon/tcon.h			\
 	$(CCANDIR)/ccan/time/time.h			\
 	$(CCANDIR)/ccan/timer/timer.h			\
-	$(CCANDIR)/ccan/typesafe_cb/typesafe_cb.h
+	$(CCANDIR)/ccan/typesafe_cb/typesafe_cb.h	\
+	$(CCANDIR)/ccan/utf8/utf8.h
 
-BITCOIN_HEADERS := bitcoin/address.h		\
-	bitcoin/base58.h			\
-	bitcoin/block.h				\
-	bitcoin/locktime.h			\
-	bitcoin/privkey.h			\
-	bitcoin/pubkey.h			\
-	bitcoin/pullpush.h			\
-	bitcoin/script.h			\
-	bitcoin/shadouble.h			\
-	bitcoin/signature.h			\
-	bitcoin/tx.h				\
-	bitcoin/varint.h
-
-CORE_TX_HEADERS := close_tx.h			\
-	find_p2sh_out.h				\
-	permute_tx.h				\
-	remove_dust.h
-
-CORE_HEADERS := irc.h				\
-	opt_bits.h				\
-	overflows.h				\
-	protobuf_convert.h			\
-	status.h				\
-	type_to_string.h			\
-	utils.h					\
-	version.h
-
-GEN_HEADERS := 	gen_version.h			\
-	lightning.pb-c.h
-
-LIBSODIUM_HEADERS := libsodium/src/libsodium/include/sodium.h
+ALL_GEN_HEADERS += gen_version.h
 
 CDUMP_OBJS := ccan-cdump.o ccan-strmap.o
 
 WIRE_GEN := tools/generate-wire.py
 
-MANPAGES := doc/lightning-cli.1 \
-	doc/lightning-delinvoice.7 \
-	doc/lightning-getroute.7 \
-	doc/lightning-invoice.7 \
-	doc/lightning-listinvoice.7 \
-	doc/lightning-sendpay.7 \
-	doc/lightning-waitinvoice.7
+ALL_PROGRAMS =
 
-PROGRAMS := $(TEST_PROGRAMS)
-
+CPPFLAGS = -DBINTOPKGLIBEXECDIR='"'$(shell sh tools/rel.sh $(bindir) $(pkglibexecdir))'"'
 CWARNFLAGS := -Werror -Wall -Wundef -Wmissing-prototypes -Wmissing-declarations -Wstrict-prototypes -Wold-style-definition
-CDEBUGFLAGS := -g -fstack-protector
-CFLAGS := $(CWARNFLAGS) $(CDEBUGFLAGS) -I $(CCANDIR) -I secp256k1/include/ -I libsodium/src/libsodium/include/ -I . $(FEATURES) $(COVFLAGS)
+CDEBUGFLAGS := -std=gnu11 -g -fstack-protector
+CFLAGS = $(CPPFLAGS) $(CWARNFLAGS) $(CDEBUGFLAGS) -I $(CCANDIR) $(EXTERNAL_INCLUDE_FLAGS) -I . -I/usr/local/include $(FEATURES) $(COVFLAGS) $(DEV_CFLAGS) -DSHACHAIN_BITS=48 -DJSMN_PARENT_LINKS $(PIE_CFLAGS) $(COMPAT_CFLAGS)
 
-LDLIBS := -lprotobuf-c -lgmp -lsqlite3 $(COVFLAGS)
-$(PROGRAMS): CFLAGS+=-I.
+# We can get configurator to run a different compile cmd to cross-configure.
+CONFIGURATOR_CC := $(CC)
 
-default: $(PROGRAMS) $(MANPAGES) daemon-all
+LDFLAGS = $(PIE_LDFLAGS)
+LDLIBS = -L/usr/local/lib -lm -lgmp -lsqlite3 -lz $(COVFLAGS)
 
+default: all-programs all-test-programs
+
+config.vars ccan/config.h: configure
+	@if [ ! -f config.vars ]; then echo 'The 1990s are calling: use ./configure!' >&2; exit 1; fi
+	./configure --reconfigure
+
+include external/Makefile
 include bitcoin/Makefile
+include common/Makefile
 include wire/Makefile
+include wallet/Makefile
+include hsmd/Makefile
+include gossipd/Makefile
+include openingd/Makefile
+include channeld/Makefile
+include closingd/Makefile
+include onchaind/Makefile
+include connectd/Makefile
 include lightningd/Makefile
+include cli/Makefile
+include doc/Makefile
+include devtools/Makefile
 
 # Git doesn't maintain timestamps, so we only regen if git says we should.
 CHANGED_FROM_GIT = [ x"`git log $@ | head -n1`" != x"`git log $< | head -n1`" -o x"`git diff $<`" != x"" ]
 
-$(MANPAGES): doc/%: doc/%.txt
-	@if $(CHANGED_FROM_GIT); then echo a2x --format=manpage $<; a2x --format=manpage $<; else touch $@; fi
+ifneq ($(TEST_GROUP_COUNT),)
+PYTEST_OPTS += --test-group=$(TEST_GROUP) --test-group-count=$(TEST_GROUP_COUNT)
+endif
 
-# Everything depends on the CCAN headers.
-$(CCAN_OBJS) $(CDUMP_OBJS) $(HELPER_OBJS) $(BITCOIN_OBJS) $(TEST_PROGRAMS:=.o) ccan/ccan/cdump/tools/cdump-enumstr.o: $(CCAN_HEADERS)
+ifneq ($(PYTEST_PAR),)
+PYTEST_OPTS += -n=$(PYTEST_PAR)
+endif
 
-# Except for CCAN, everything depends on bitcoin/ and core headers.
-$(HELPER_OBJS) $(CORE_OBJS) $(CORE_TX_OBJS) $(CORE_PROTOBUF_OBJS) $(BITCOIN_OBJS) $(LIBBASE58_OBJS) $(WIRE_OBJS) $(TEST_PROGRAMS:=.o): $(BITCOIN_HEADERS) $(CORE_HEADERS) $(CCAN_HEADERS) $(GEN_HEADERS) $(LIBBASE58_HEADERS) $(LIBSODIUM_HEADERS)
+check:
+	$(MAKE) installcheck
+	$(MAKE) pytest
 
-test-protocol: test/test_protocol
-	set -e; TMP=`mktemp`; for f in test/commits/*.script; do if ! $(VALGRIND) test/test_protocol < $$f > $$TMP; then echo "test/test_protocol < $$f FAILED" >&2; exit 1; fi; diff -u $$TMP $$f.expected; done; rm $$TMP
-
-doc/protocol-%.svg: test/test_protocol
-	test/test_protocol --svg < test/commits/$*.script > $@
-
-protocol-diagrams: $(patsubst %.script, doc/protocol-%.svg, $(notdir $(wildcard test/commits/*.script)))
-
-check: test-protocol
+pytest: $(ALL_PROGRAMS)
+ifndef PYTEST
+	@echo "py.test is required to run the integration tests, please install using 'pip3 install -r tests/requirements.txt'"
+	exit 1
+else
+# Explicitly hand DEVELOPER and VALGRIND so you can override on make cmd line.
+	PYTHONPATH=contrib/pylightning:$$PYTHONPATH TEST_DEBUG=1 DEVELOPER=$(DEVELOPER) VALGRIND=$(VALGRIND) $(PYTEST) tests/ $(PYTEST_OPTS)
+endif
 
 # Keep includes in alpha order.
 check-src-include-order/%: %
@@ -254,46 +233,77 @@ check-hdr-include-order/%: %
 	@if [ "$$(grep '^#include' < $< | tail -n +2)" != "$$(grep '^#include' < $< | tail -n +2 | LC_ALL=C sort)" ]; then echo "$<:1: includes out of order"; exit 1; fi
 
 # Make sure Makefile includes all headers.
-check-makefile: check-daemon-makefile
-	@if [ "`echo bitcoin/*.h`" != "$(BITCOIN_HEADERS)" ]; then echo BITCOIN_HEADERS incorrect; exit 1; fi
-	@if [ x"`ls *.h | grep -v ^gen_ | fgrep -v lightning.pb-c.h`" != x"`echo $(CORE_HEADERS) $(CORE_TX_HEADERS) | tr ' ' '\n' | LC_ALL=C sort`" ]; then echo CORE_HEADERS incorrect; exit 1; fi
+check-makefile:
 	@if [ x"$(CCANDIR)/config.h `find $(CCANDIR)/ccan -name '*.h' | grep -v /test/ | LC_ALL=C sort | tr '\n' ' '`" != x"$(CCAN_HEADERS) " ]; then echo CCAN_HEADERS incorrect; exit 1; fi
 
-# Any mention of BOLT# must be followed by an exact quote, modulo whitepace.
-bolt-check/%: % bolt-precheck check-bolt
-	@[ ! -d .tmp.lightningrfc ] || ./check-bolt .tmp.lightningrfc $<
+# Any mention of BOLT# must be followed by an exact quote, modulo whitespace.
+bolt-check/%: % bolt-precheck tools/check-bolt
+	@[ ! -d .tmp.lightningrfc ] || tools/check-bolt .tmp.lightningrfc $<
 
 bolt-precheck:
-	@rm -rf .tmp.lightningrfc; if [ ! -d $(BOLTDIR) ]; then echo Not checking BOLT references: BOLTDIR $(BOLTDIR) does not exist >&2; exit 0; fi; set -e; if [ -n "$(BOLTVERSION)" ]; then git clone -q -b $(BOLTVERSION) $(BOLTDIR) .tmp.lightningrfc; else cp -a $(BOLTDIR) .tmp.lightningrfc; fi
+	@rm -rf .tmp.lightningrfc; if [ ! -d $(BOLTDIR) ]; then echo Not checking BOLT references: BOLTDIR $(BOLTDIR) does not exist >&2; exit 0; fi; set -e; if [ -n "$(BOLTVERSION)" ]; then git clone -q $(BOLTDIR) .tmp.lightningrfc && cd .tmp.lightningrfc && git checkout -q $(BOLTVERSION); else cp -a $(BOLTDIR) .tmp.lightningrfc; fi
 
-check-source-bolt: $(CORE_SRC:%=bolt-check/%) $(CORE_TX_SRC:%=bolt-check/%) $(CORE_PROTOBUF_SRC:%=bolt-check/%) $(CORE_HEADERS:%=bolt-check/%) $(TEST_PROGRAMS:%=bolt-check/%.c)
+check-source-bolt: $(ALL_TEST_PROGRAMS:%=bolt-check/%.c)
 
-check-bolt: check-bolt.o $(CCAN_OBJS)
+tools/check-bolt: tools/check-bolt.o $(CCAN_OBJS) common/utils.o
 
-check-bolt.o: $(CCAN_HEADERS)
+tools/check-bolt.o: $(CCAN_HEADERS)
 
 check-whitespace/%: %
 	@if grep -Hn '[ 	]$$' $<; then echo Extraneous whitespace found >&2; exit 1; fi
 
-check-whitespace: check-whitespace/Makefile check-whitespace/check-bolt.c $(CORE_SRC:%=check-whitespace/%) $(CORE_TX_SRC:%=check-whitespace/%) $(CORE_PROTOBUF_SRC:%=check-whitespace/%) $(CORE_HEADERS:%=check-whitespace/%)
+check-whitespace: check-whitespace/Makefile check-whitespace/tools/check-bolt.c $(ALL_TEST_PROGRAMS:%=check-whitespace/%.c)
 
-check-source: check-makefile check-source-bolt check-whitespace	\
-	$(CORE_SRC:%=check-src-include-order/%)			\
-	$(CORE_TX_SRC:%=check-src-include-order/%)		\
-	$(CORE_PROTOBUF_SRC:%=check-src-include-order/%)	\
-	$(BITCOIN_SRC:%=check-src-include-order/%)		\
-	$(CORE_HEADERS:%=check-hdr-include-order/%)		\
-	$(CORE_TX_HEADERS:%=check-hdr-include-order/%)		\
-	$(BITCOIN_HEADERS:%=check-hdr-include-order/%)
+check-markdown:
+	@tools/check-markdown.sh
 
-full-check: check $(TEST_PROGRAMS) check-source
+check-spelling:
+	@tools/check-spelling.sh
 
-coverage/coverage.info: check $(TEST_PROGRAMS)
+PYSRC=$(shell git ls-files "*.py") contrib/pylightning/lightning-pay
+
+check-python:
+	@# E501 line too long (N > 79 characters)
+	@# E731 do not assign a lambda expression, use a def
+	@flake8 --ignore=E501,E731 --exclude=contrib/pylightning/lightning/__init__.py ${PYSRC}
+
+check-includes:
+	@tools/check-includes.sh
+
+# cppcheck gets confused by list_for_each(head, i, list): thinks i is uninit.
+.cppcheck-suppress:
+	@git ls-files -- "*.c" "*.h" | grep -vE '^ccan/' | xargs grep -n 'list_for_each' | sed 's/\([^:]*:.*\):.*/uninitvar:\1/' > $@
+
+check-cppcheck: .cppcheck-suppress
+	@trap 'rm -f .cppcheck-suppress' 0; git ls-files -- "*.c" "*.h" | grep -vE '^ccan/' | xargs cppcheck -q --language=c --std=c11 --error-exitcode=1 --suppressions-list=.cppcheck-suppress
+
+check-shellcheck:
+	git ls-files -- "*.sh" | xargs shellcheck
+
+check-setup_locale:
+	@tools/check-setup_locale.sh
+
+check-tmpctx:
+	@if git grep -n 'tal_free[(]tmpctx)' | grep -Ev '^ccan/|/test/|^common/daemon.c:|^common/utils.c:'; then echo "Don't free tmpctx!">&2; exit 1; fi
+
+check-discouraged-functions:
+	@if git grep -E "[^a-z_/](fgets|fputs|gets|scanf|sprintf)\(" -- "*.c" "*.h" ":(exclude)ccan/"; then exit 1; fi
+
+check-source: check-makefile check-source-bolt check-whitespace check-markdown check-spelling check-python check-includes check-cppcheck check-shellcheck check-setup_locale check-tmpctx check-discouraged-functions
+
+full-check: check check-source
+
+coverage/coverage.info: check pytest
 	mkdir coverage || true
 	lcov --capture --directory . --output-file coverage/coverage.info
 
 coverage: coverage/coverage.info
 	genhtml coverage/coverage.info --output-directory coverage
+
+# We make libwallycore.la a dependency, so that it gets built normally, without ncc.
+# Ncc can't handle the libwally source code (yet).
+ncc: external/libwally-core/src/libwallycore.la
+	make CC="ncc -ncgcc -ncld -ncfabs" AR=nccar LD=nccld
 
 # Ignore test/ directories.
 TAGS: FORCE
@@ -302,129 +312,201 @@ FORCE::
 
 ccan/ccan/cdump/tools/cdump-enumstr: ccan/ccan/cdump/tools/cdump-enumstr.o $(CDUMP_OBJS) $(CCAN_OBJS)
 
-# We build a static libsecpk1, since we need ecdh
-# (and it's not API stable yet!).
-libsecp256k1.a: secp256k1/libsecp256k1.la
-
-secp256k1/libsecp256k1.la:
-	cd secp256k1 && ./autogen.sh && ./configure CC="$(CC)" --enable-static=yes --enable-shared=no --enable-tests=no --enable-experimental=yes --enable-module-ecdh=yes --libdir=`pwd`/..
-	$(MAKE) -C secp256k1 install-exec
-
-# We build libsodium, since Ubuntu xenial has one too old.
-libsodium.a: libsodium/src/libsodium/libsodium.la
-
-libsodium/src/libsodium/include/sodium.h:
-	git submodule update libsodium
-	[ -f $@ ] || git submodule update --init libsodium
-
-libsodium/src/libsodium/libsodium.la: libsodium/src/libsodium/include/sodium.h
-	cd libsodium && ./autogen.sh && ./configure CC="$(CC)" --enable-static=yes --enable-shared=no --enable-tests=no --libdir=`pwd`/..
-	$(MAKE) -C libsodium install-exec
-
-lightning.pb-c.c lightning.pb-c.h: lightning.proto
-	@if $(CHANGED_FROM_GIT); then echo $(PROTOCC) lightning.proto --c_out=.; $(PROTOCC) lightning.proto --c_out=.; else touch $@; fi
-
-$(TEST_PROGRAMS): % : %.o $(BITCOIN_OBJS) $(LIBBASE58_OBJS) $(WIRE_OBJS) $(CCAN_OBJS) utils.o version.o libsecp256k1.a libsodium.a
-
-ccan/config.h: ccan/tools/configurator/configurator
-	if $< > $@.new; then mv $@.new $@; else rm $@.new; exit 1; fi
-
-doc/deployable-lightning.pdf: doc/deployable-lightning.lyx doc/bitcoin.bib
-	lyx -E pdf $@ $<
-
-doc/deployable-lightning.tex: doc/deployable-lightning.lyx
-	lyx -E latex $@ $<
-
-state-diagrams: doc/normal-states.svg doc/simplified-states.svg doc/error-states.svg doc/full-states.svg
-
-%.svg: %.dot
-	dot -Tsvg $< > $@ || (rm -f $@; false)
-
-doc/simplified-states.dot: test/test_state_coverage
-	test/test_state_coverage --dot --dot-simplify > $@
-
-doc/normal-states.dot: test/test_state_coverage
-	test/test_state_coverage --dot > $@
-
-doc/error-states.dot: test/test_state_coverage
-	test/test_state_coverage --dot-all --dot-include-errors > $@
-
-doc/full-states.dot: test/test_state_coverage
-	test/test_state_coverage --dot-all --dot-include-errors --dot-include-nops > $@
+ALL_PROGRAMS += ccan/ccan/cdump/tools/cdump-enumstr
+# Can't add to ALL_OBJS, as that makes a circular dep.
+ccan/ccan/cdump/tools/cdump-enumstr.o: $(CCAN_HEADERS) Makefile
 
 gen_version.h: FORCE
-	@(echo "#define VERSION \"`git describe --always --dirty`\"" && echo "#define VERSION_NAME \"$(NAME)\"" && echo "#define BUILD_FEATURES \"$(FEATURES)\"") > $@.new
+	@(echo "#define VERSION \"$(VERSION)\"" && echo "#define BUILD_FEATURES \"$(FEATURES)\"") > $@.new
 	@if cmp $@.new $@ >/dev/null 2>&2; then rm -f $@.new; else mv $@.new $@; echo Version updated; fi
 
-version.o: gen_version.h
+# All binaries require the external libs, ccan
+$(ALL_PROGRAMS) $(ALL_TEST_PROGRAMS): $(EXTERNAL_LIBS) $(CCAN_OBJS)
+
+# Each test program depends on its own object.
+$(ALL_TEST_PROGRAMS): %: %.o
+
+# Without this rule, the (built-in) link line contains
+# external/libwallycore.a directly, which causes a symbol clash (it
+# uses some ccan modules internally).  We want to rely on -lwallycore etc.
+# (as per EXTERNAL_LDLIBS) so we filter them out here.
+$(ALL_PROGRAMS) $(ALL_TEST_PROGRAMS):
+	$(LINK.o) $(filter-out %.a,$^) $(LOADLIBES) $(EXTERNAL_LDLIBS) $(LDLIBS) -o $@
+
+# Everything depends on the CCAN headers, and Makefile
+$(CCAN_OBJS) $(CDUMP_OBJS): $(CCAN_HEADERS) Makefile
+
+# Except for CCAN, we treat everything else as dependent on external/ bitcoin/ common/ wire/ and all generated headers, and Makefile
+$(ALL_OBJS): $(BITCOIN_HEADERS) $(COMMON_HEADERS) $(CCAN_HEADERS) $(WIRE_HEADERS) $(ALL_GEN_HEADERS) $(EXTERNAL_HEADERS) Makefile
+
+# We generate headers in two ways, so regen when either changes (or Makefile)
+$(ALL_GEN_HEADERS): ccan/ccan/cdump/tools/cdump-enumstr $(WIRE_GEN) Makefile
 
 update-ccan:
 	mv ccan ccan.old
 	DIR=$$(pwd)/ccan; cd ../ccan && ./tools/create-ccan-tree -a $$DIR `cd $$DIR.old/ccan && find * -name _info | sed s,/_info,, | sort` $(CCAN_NEW)
 	mkdir -p ccan/tools/configurator
-	cp ../ccan/tools/configurator/configurator.c ccan/tools/configurator/
+	cp ../ccan/tools/configurator/configurator.c ../ccan/doc/configurator.1 ccan/tools/configurator/
 	$(MAKE) ccan/config.h
 	grep -v '^CCAN version:' ccan.old/README > ccan/README
 	echo CCAN version: `git -C ../ccan describe` >> ccan/README
 	$(RM) -r ccan.old
+	$(RM) -r ccan/ccan/hash/ ccan/ccan/tal/talloc/	# Unnecessary deps
 
-update-secp256k1:
-	mv secp256k1 secp256k1.old
-	cp -a ../secp256k1 secp256k1
-	rm -rf secp256k1/.git
-	grep -v '^secp256k1 version:' secp256k1.old/README > secp256k1/README
-	echo secp256k1 version: `git -C ../secp256k1 describe 2>/dev/null || git -C ../secp256k1 show HEAD --format=%H` >> secp256k1/README
-	$(RM) -r secp256k1.old
+# Now ALL_PROGRAMS is fully populated, we can expand it.
+all-programs: $(ALL_PROGRAMS)
+all-test-programs: $(ALL_TEST_PROGRAMS)
 
 distclean: clean
-	$(MAKE) -C secp256k1/ distclean || true
-	$(RM) libsecp256k1.a secp256k1/libsecp256k1.la
-	$(RM) libsodium.a libsodium/libsodium.la
+	$(RM) ccan/config.h config.vars
 
 maintainer-clean: distclean
 	@echo 'This command is intended for maintainers to use; it'
 	@echo 'deletes files that may need special tools to rebuild.'
-	$(RM) lightning.pb-c.c lightning.pb-c.h
-	$(RM) doc/deployable-lightning.pdf
-	$(RM) $(MANPAGES)
 
-clean: daemon-clean wire-clean
-	$(MAKE) -C secp256k1/ clean || true
-	$(RM) libsecp256k1.{a,la}
-	$(RM) libsodium.{a,la}
-	$(RM) $(PROGRAMS)
-	$(RM) bitcoin/*.o *.o $(PROGRAMS:=.o) $(CCAN_OBJS)
-	$(RM) ccan/config.h gen_*.h
+clean: wire-clean
+	$(RM) $(CCAN_OBJS) $(CDUMP_OBJS) $(ALL_OBJS)
+	$(RM) $(ALL_PROGRAMS) $(ALL_PROGRAMS:=.o)
+	$(RM) $(ALL_TEST_PROGRAMS) $(ALL_TEST_PROGRAMS:=.o)
+	$(RM) gen_*.h ccan/tools/configurator/configurator
 	$(RM) ccan/ccan/cdump/tools/cdump-enumstr.o
-	$(RM) doc/deployable-lightning.{aux,bbl,blg,dvi,log,out,tex}
+	$(RM) check-bolt tools/check-bolt tools/*.o
 	find . -name '*gcda' -delete
 	find . -name '*gcno' -delete
-
-include daemon/Makefile
+	find . -name '*.nccout' -delete
 
 update-mocks/%: %
-	@set -e; BASE=/tmp/mocktmp.$$$$.`echo $* | tr / _`; trap "rm -f $$BASE.*" EXIT; \
-	START=`fgrep -n '/* AUTOGENERATED MOCKS START */' $< | cut -d: -f1`;\
-	END=`fgrep -n '/* AUTOGENERATED MOCKS END */' $< | cut -d: -f1`; \
-	if [ -n "$$START" ]; then \
-	  echo $<: ; \
-	  head -n $$START $< > $$BASE.new; \
-	  (cat $$BASE.new; tail -n +$$END $<) > $$BASE.test.c; \
-	  if ! $(CC) $(CFLAGS) $$BASE.test.c -o $$BASE.out $(HELPER_OBJS) $(CCAN_OBJS) $(LDLIBS) 2>$$BASE.err; then \
-	    test/scripts/mockup.sh < $$BASE.err >> $$BASE.new; \
-	    sed -n 's,.*Generated stub for \(.*\) .*,\t\1,p' < $$BASE.new; \
-          fi; \
-	  tail -n +$$END $< >> $$BASE.new; mv $$BASE.new $<; \
-	fi
+	@tools/update-mocks.sh "$*"
 
 unittest/%: %
-	$(VALGRIND) $(VALGRIND_TEST_ARGS) $*
+	$(VG) $(VG_TEST_ARGS) $* > /dev/null
+
+# Installation directories
+prefix = /usr/local
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+libexecdir = $(exec_prefix)/libexec
+pkglibexecdir = $(libexecdir)/$(PKGNAME)
+datadir = $(prefix)/share
+docdir = $(datadir)/doc/$(PKGNAME)
+mandir = $(datadir)/man
+man1dir = $(mandir)/man1
+man5dir = $(mandir)/man5
+man7dir = $(mandir)/man7
+
+# Commands
+MKDIR_P = mkdir -p
+INSTALL = install
+INSTALL_PROGRAM = $(INSTALL)
+INSTALL_DATA = $(INSTALL) -m 644
+
+# Tags needed by some package systems.
+PRE_INSTALL = :
+NORMAL_INSTALL = :
+POST_INSTALL = :
+PRE_UNINSTALL = :
+NORMAL_UNINSTALL = :
+POST_UNINSTALL = :
+
+# Target to create directories.
+installdirs:
+	@$(NORMAL_INSTALL)
+	$(MKDIR_P) $(DESTDIR)$(bindir)
+	$(MKDIR_P) $(DESTDIR)$(pkglibexecdir)
+	$(MKDIR_P) $(DESTDIR)$(man1dir)
+	$(MKDIR_P) $(DESTDIR)$(man5dir)
+	$(MKDIR_P) $(DESTDIR)$(man7dir)
+	$(MKDIR_P) $(DESTDIR)$(docdir)
+
+# Programs to install in bindir and pkglibexecdir.
+# TODO: $(EXEEXT) support for Windows?  Needs more coding for
+# the individual Makefiles, however.
+BIN_PROGRAMS = \
+	       cli/lightning-cli \
+	       lightningd/lightningd
+PKGLIBEXEC_PROGRAMS = \
+	       lightningd/lightning_channeld \
+	       lightningd/lightning_closingd \
+	       lightningd/lightning_connectd \
+	       lightningd/lightning_gossipd \
+	       lightningd/lightning_hsmd \
+	       lightningd/lightning_onchaind \
+	       lightningd/lightning_openingd
+
+install-program: installdirs $(BIN_PROGRAMS) $(PKGLIBEXEC_PROGRAMS)
+	@$(NORMAL_INSTALL)
+	$(INSTALL_PROGRAM) $(BIN_PROGRAMS) $(DESTDIR)$(bindir)
+	$(INSTALL_PROGRAM) $(PKGLIBEXEC_PROGRAMS) $(DESTDIR)$(pkglibexecdir)
+
+MAN1PAGES = $(filter %.1,$(MANPAGES))
+MAN5PAGES = $(filter %.5,$(MANPAGES))
+MAN7PAGES = $(filter %.7,$(MANPAGES))
+DOC_DATA = README.md doc/INSTALL.md doc/HACKING.md LICENSE
+
+install-data: installdirs $(MAN1PAGES) $(MAN5PAGES) $(MAN7PAGES) $(DOC_DATA)
+	@$(NORMAL_INSTALL)
+	$(INSTALL_DATA) $(MAN1PAGES) $(DESTDIR)$(man1dir)
+	$(INSTALL_DATA) $(MAN5PAGES) $(DESTDIR)$(man5dir)
+	$(INSTALL_DATA) $(MAN7PAGES) $(DESTDIR)$(man7dir)
+	$(INSTALL_DATA) $(DOC_DATA) $(DESTDIR)$(docdir)
+
+install: install-program install-data
+
+uninstall:
+	@$(NORMAL_UNINSTALL)
+	@for f in $(BIN_PROGRAMS); do \
+	  echo rm -f $(DESTDIR)$(bindir)/`basename $$f`; \
+	  rm -f $(DESTDIR)$(bindir)/`basename $$f`; \
+	done
+	@for f in $(PKGLIBEXEC_PROGRAMS); do \
+	  echo rm -f $(DESTDIR)$(pkglibexecdir)/`basename $$f`; \
+	  rm -f $(DESTDIR)$(pkglibexecdir)/`basename $$f`; \
+	done
+	@for f in $(MAN1PAGES); do \
+	  echo rm -f $(DESTDIR)$(man1dir)/`basename $$f`; \
+	  rm -f $(DESTDIR)$(man1dir)/`basename $$f`; \
+	done
+	@for f in $(MAN5PAGES); do \
+	  echo rm -f $(DESTDIR)$(man5dir)/`basename $$f`; \
+	  rm -f $(DESTDIR)$(man5dir)/`basename $$f`; \
+	done
+	@for f in $(MAN7PAGES); do \
+	  echo rm -f $(DESTDIR)$(man7dir)/`basename $$f`; \
+	  rm -f $(DESTDIR)$(man7dir)/`basename $$f`; \
+	done
+	@for f in $(DOC_DATA); do \
+	  echo rm -f $(DESTDIR)$(docdir)/`basename $$f`; \
+	  rm -f $(DESTDIR)$(docdir)/`basename $$f`; \
+	done
+
+installcheck:
+	@rm -rf testinstall || true
+	$(MAKE) DESTDIR=$$(pwd)/testinstall install
+	testinstall$(bindir)/lightningd --test-daemons-only --lightning-dir=testinstall
+	$(MAKE) DESTDIR=$$(pwd)/testinstall uninstall
+	@if test `find testinstall '!' -type d | wc -l` -ne 0; then \
+		echo 'make uninstall left some files in testinstall directory!'; \
+		exit 1; \
+	fi
+	@rm -rf testinstall || true
+
+.PHONY: installdirs install-program install-data install uninstall \
+	installcheck ncc bin-tarball
+
+# Make a tarball of opt/clightning/, optionally with label for distribution.
+bin-tarball: clightning-$(VERSION)-$(DISTRO).tar.xz
+clightning-$(VERSION)-$(DISTRO).tar.xz: DESTDIR=$(shell pwd)/
+clightning-$(VERSION)-$(DISTRO).tar.xz: prefix=opt/clightning
+clightning-$(VERSION)-$(DISTRO).tar.xz: install
+	trap "rm -rf opt" 0; tar cvfa $@ opt/
 
 ccan-breakpoint.o: $(CCANDIR)/ccan/breakpoint/breakpoint.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-tal.o: $(CCANDIR)/ccan/tal/tal.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-tal-str.o: $(CCANDIR)/ccan/tal/str/str.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-tal-link.o: $(CCANDIR)/ccan/tal/link/link.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-tal-path.o: $(CCANDIR)/ccan/tal/path/path.c
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -438,6 +520,8 @@ ccan-asort.o: $(CCANDIR)/ccan/asort/asort.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-autodata.o: $(CCANDIR)/ccan/autodata/autodata.c
 	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-ptr_valid.o: $(CCANDIR)/ccan/ptr_valid/ptr_valid.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-read_write_all.o: $(CCANDIR)/ccan/read_write_all/read_write_all.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-str.o: $(CCANDIR)/ccan/str/str.c
@@ -450,18 +534,22 @@ ccan-opt-parse.o: $(CCANDIR)/ccan/opt/parse.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-opt-usage.o: $(CCANDIR)/ccan/opt/usage.c
 	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-daemonize.o: $(CCANDIR)/ccan/daemonize/daemonize.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-err.o: $(CCANDIR)/ccan/err/err.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-noerr.o: $(CCANDIR)/ccan/noerr/noerr.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-str-hex.o: $(CCANDIR)/ccan/str/hex/hex.c
 	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-crc.o: $(CCANDIR)/ccan/crc/crc.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-crypto-hmac.o: $(CCANDIR)/ccan/crypto/hmac_sha256/hmac_sha256.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-crypto-hkdf.o: $(CCANDIR)/ccan/crypto/hkdf_sha256/hkdf_sha256.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-crypto-shachain.o: $(CCANDIR)/ccan/crypto/shachain/shachain.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -DSHACHAIN_BITS=48 -c -o $@ $<
 ccan-crypto-sha256.o: $(CCANDIR)/ccan/crypto/sha256/sha256.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-crypto-ripemd160.o: $(CCANDIR)/ccan/crypto/ripemd160/ripemd160.c
@@ -475,6 +563,8 @@ ccan-crypto-siphash24.o: $(CCANDIR)/ccan/crypto/siphash24/siphash24.c
 ccan-htable.o: $(CCANDIR)/ccan/htable/htable.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-ilog.o: $(CCANDIR)/ccan/ilog/ilog.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-intmap.o: $(CCANDIR)/ccan/intmap/intmap.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-isaac.o: $(CCANDIR)/ccan/isaac/isaac.c
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -495,4 +585,12 @@ ccan-pipecmd.o: $(CCANDIR)/ccan/pipecmd/pipecmd.c
 ccan-mem.o: $(CCANDIR)/ccan/mem/mem.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-fdpass.o: $(CCANDIR)/ccan/fdpass/fdpass.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-bitops.o: $(CCANDIR)/ccan/bitops/bitops.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-rbuf.o: $(CCANDIR)/ccan/rbuf/rbuf.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-str-base32.o: $(CCANDIR)/ccan/str/base32/base32.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-utf8.o: $(CCANDIR)/ccan/utf8/utf8.c
 	$(CC) $(CFLAGS) -c -o $@ $<

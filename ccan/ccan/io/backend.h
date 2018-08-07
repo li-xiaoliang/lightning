@@ -2,7 +2,6 @@
 #ifndef CCAN_IO_BACKEND_H
 #define CCAN_IO_BACKEND_H
 #include <stdbool.h>
-#include <poll.h>
 #include "io_plan.h"
 #include <ccan/list/list.h>
 
@@ -26,8 +25,9 @@ struct io_listener {
 enum io_plan_status {
 	/* As before calling next function. */
 	IO_UNSET,
-	/* Normal. */
-	IO_POLLING,
+	/* Normal, but haven't started yet. */
+	IO_POLLING_NOTSTARTED,
+	IO_POLLING_STARTED,
 	/* Waiting for io_wake */
 	IO_WAITING,
 	/* Always do this. */

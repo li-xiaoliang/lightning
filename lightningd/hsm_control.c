@@ -1,91 +1,68 @@
 #include "hsm_control.h"
 #include "lightningd.h"
-#include "peer_control.h"
-#include "subdaemon.h"
+#include "subd.h"
 #include <ccan/err/err.h>
+#include <ccan/fdpass/fdpass.h>
 #include <ccan/io/io.h>
 #include <ccan/take/take.h>
-#include <daemon/log.h>
+#include <common/status.h>
+#include <common/utils.h>
+#include <errno.h>
+#include <hsmd/gen_hsm_client_wire.h>
 #include <inttypes.h>
-#include <lightningd/hsm/gen_hsm_control_wire.h>
-#include <lightningd/hsm/gen_hsm_status_wire.h>
+#include <lightningd/hsm_control.h>
+#include <lightningd/log.h>
+#include <lightningd/log_status.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <wally_bip32.h>
+#include <wire/wire_sync.h>
 
-static void hsm_init_done(struct subdaemon *hsm, const u8 *msg,
-			  struct lightningd *ld)
+int hsm_get_client_fd(struct lightningd *ld,
+		      const struct pubkey *id,
+		      u64 dbid,
+		      int capabilities)
 {
-	if (!fromwire_hsmctl_init_response(msg, NULL, &ld->dstate.id))
-		errx(1, "HSM did not give init response");
+	int hsm_fd;
+	u8 *msg;
 
-	log_info_struct(ld->log, "Our ID: %s", struct pubkey, &ld->dstate.id);
-	io_break(ld->hsm);
+	assert(dbid);
+	msg = towire_hsm_client_hsmfd(NULL, id, dbid, capabilities);
+	if (!wire_sync_write(ld->hsm_fd, take(msg)))
+		fatal("Could not write to HSM: %s", strerror(errno));
+
+	msg = wire_sync_read(tmpctx, ld->hsm_fd);
+	if (!fromwire_hsm_client_hsmfd_reply(msg))
+		fatal("Bad reply from HSM: %s", tal_hex(tmpctx, msg));
+
+	hsm_fd = fdpass_recv(ld->hsm_fd);
+	if (hsm_fd < 0)
+		fatal("Could not read fd from HSM: %s", strerror(errno));
+	return hsm_fd;
 }
 
-static void hsm_finished(struct subdaemon *hsm, int status)
+void hsm_init(struct lightningd *ld)
 {
-	if (WIFEXITED(status))
-		errx(1, "HSM failed (exit status %i), exiting.",
-		     WEXITSTATUS(status));
-	errx(1, "HSM failed (signal %u), exiting.", WTERMSIG(status));
-}
+	u8 *msg;
+	int fds[2];
 
-static enum subdaemon_status hsm_status(struct subdaemon *hsm, const u8 *msg,
-					int fd)
-{
-	enum hsm_status_wire_type t = fromwire_peektype(msg);
-	u8 *badmsg;
-	struct peer *peer;
-	u64 id;
+	/* We actually send requests synchronously: only status is async. */
+	if (socketpair(AF_LOCAL, SOCK_STREAM, 0, fds) != 0)
+		err(1, "Could not create hsm socketpair");
 
-	switch (t) {
-	case WIRE_HSMSTATUS_CLIENT_BAD_REQUEST:
-		if (!fromwire_hsmstatus_client_bad_request(msg, msg, NULL,
-							   &id, &badmsg))
-			errx(1, "HSM bad status %s", tal_hex(msg, msg));
-		peer = peer_by_unique_id(hsm->ld, id);
-
-		/* "Shouldn't happen" */
-		errx(1, "HSM says bad cmd from %"PRIu64" (%s): %s",
-		     id,
-		     peer ? (peer->id ? type_to_string(msg, struct pubkey,
-						       peer->id)
-			     : "pubkey not yet known")
-		     : "unknown peer",
-		     tal_hex(msg, badmsg));
-
-	/* We don't get called for failed status. */
-	case WIRE_HSMSTATUS_INIT_FAILED:
-	case WIRE_HSMSTATUS_WRITEMSG_FAILED:
-	case WIRE_HSMSTATUS_BAD_REQUEST:
-	case WIRE_HSMSTATUS_FD_FAILED:
-		break;
-	}
-	return STATUS_COMPLETE;
-}
-
-void hsm_init(struct lightningd *ld, bool newdir)
-{
-	bool create;
-
-	ld->hsm = new_subdaemon(ld, ld, "lightningd_hsm",
-				hsm_status_wire_type_name,
-				hsm_control_wire_type_name,
-				hsm_status, hsm_finished, -1);
+	ld->hsm = new_global_subd(ld, "lightning_hsmd", NULL, NULL,
+				  take(&fds[1]), NULL);
 	if (!ld->hsm)
-		err(1, "Could not subdaemon hsm");
+		err(1, "Could not subd hsm");
 
-	if (newdir)
-		create = true;
-	else
-		create = (access("hsm_secret", F_OK) != 0);
+	ld->hsm_fd = fds[0];
+	if (!wire_sync_write(ld->hsm_fd, towire_hsm_init(tmpctx)))
+		err(1, "Writing init msg to hsm");
 
-	if (create)
-		subdaemon_req(ld->hsm, take(towire_hsmctl_init_new(ld->hsm)),
-			      -1, NULL, hsm_init_done, ld);
-	else
-		subdaemon_req(ld->hsm, take(towire_hsmctl_init_load(ld->hsm)),
-			      -1, NULL, hsm_init_done, ld);
-
-	if (io_loop(NULL, NULL) != ld->hsm)
-		errx(1, "Unexpected io exit during HSM startup");
+	ld->wallet->bip32_base = tal(ld->wallet, struct ext_key);
+	msg = wire_sync_read(tmpctx, ld->hsm_fd);
+	if (!fromwire_hsm_init_reply(msg,
+				     &ld->id, ld->wallet->bip32_base))
+		errx(1, "HSM did not give init reply");
 }
-

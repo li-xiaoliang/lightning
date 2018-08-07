@@ -17,11 +17,19 @@ static struct fd **fds = NULL;
 static LIST_HEAD(closing);
 static LIST_HEAD(always);
 static struct timemono (*nowfn)(void) = time_mono;
+static int (*pollfn)(struct pollfd *fds, nfds_t nfds, int timeout) = poll;
 
 struct timemono (*io_time_override(struct timemono (*now)(void)))(void)
 {
 	struct timemono (*old)(void) = nowfn;
 	nowfn = now;
+	return old;
+}
+
+int (*io_poll_override(int (*poll)(struct pollfd *fds, nfds_t nfds, int timeout)))(struct pollfd *, nfds_t, int)
+{
+	int (*old)(struct pollfd *fds, nfds_t nfds, int timeout) = pollfn;
+	pollfn = poll;
 	return old;
 }
 
@@ -122,9 +130,11 @@ void backend_new_plan(struct io_conn *conn)
 		num_waiting--;
 
 	pfd->events = 0;
-	if (conn->plan[IO_IN].status == IO_POLLING)
+	if (conn->plan[IO_IN].status == IO_POLLING_NOTSTARTED
+	    || conn->plan[IO_IN].status == IO_POLLING_STARTED)
 		pfd->events |= POLLIN;
-	if (conn->plan[IO_OUT].status == IO_POLLING)
+	if (conn->plan[IO_OUT].status == IO_POLLING_NOTSTARTED
+	    || conn->plan[IO_OUT].status == IO_POLLING_STARTED)
 		pfd->events |= POLLOUT;
 
 	if (pfd->events) {
@@ -269,9 +279,14 @@ void *io_loop(struct timers *timers, struct timer **expired)
 			}
 		}
 
-		r = poll(pollfds, num_fds, ms_timeout);
-		if (r < 0)
+		r = pollfn(pollfds, num_fds, ms_timeout);
+		if (r < 0) {
+			/* Signals shouldn't break us, unless they set
+			 * io_loop_return. */
+			if (errno == EINTR)
+				continue;
 			break;
+		}
 
 		for (i = 0; i < num_fds && !io_loop_return; i++) {
 			struct io_conn *c = (void *)fds[i];

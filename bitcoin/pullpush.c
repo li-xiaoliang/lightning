@@ -1,8 +1,8 @@
 #include "pullpush.h"
 #include "varint.h"
+#include <assert.h>
 #include <ccan/endian/endian.h>
 #include <ccan/mem/mem.h>
-#include <ccan/tal/tal.h>
 
 void push_varint(varint_t v,
 		 void (*push)(const void *, size_t, void *), void *pushp)
@@ -26,12 +26,12 @@ void push_le64(u64 v,
 	push(&l, sizeof(l), pushp);
 }
 
-void push_varint_blob(const void *blob, varint_t len,
+void push_varint_blob(const tal_t *blob,
 		      void (*push)(const void *, size_t, void *),
 		      void *pushp)
 {
-	push_varint(len, push, pushp);
-	push(blob, len, pushp);
+	push_varint(tal_bytelen(blob), push, pushp);
+	push(blob, tal_bytelen(blob), pushp);
 }
 
 void push(const void *data, size_t len, void *pptr_)
@@ -58,6 +58,7 @@ const u8 *pull(const u8 **cursor, size_t *max, void *copy, size_t n)
 	}
 	*cursor += n;
 	*max -= n;
+	assert(p);
 	if (copy)
 		memcpy(copy, p, n);
 	return memcheck(p, n);

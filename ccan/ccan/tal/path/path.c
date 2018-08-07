@@ -1,7 +1,6 @@
 /* Licensed under BSD-MIT - see LICENSE file for details */
 #include <ccan/tal/path/path.h>
 #include <ccan/str/str.h>
-#include <ccan/take/take.h>
 #include <ccan/tal/str/str.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -11,9 +10,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <assert.h>
-
-#define PATH_SEP_STR "/"
-#define PATH_SEP (PATH_SEP_STR[0])
 
 char *path_cwd(const tal_t *ctx)
 {
@@ -53,7 +49,7 @@ char *path_join(const tal_t *ctx, const char *base, const char *a)
 	ret = tal_dup_arr(ctx, char, base, len, 1 + strlen(a) + 1);
 	if (!ret)
 		goto out;
-	if (ret[len-1] != PATH_SEP)
+	if (len != 0 && ret[len-1] != PATH_SEP)
 		ret[len++] = PATH_SEP;
 	strcpy(ret + len, a);
 

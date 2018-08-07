@@ -1,40 +1,56 @@
 # Included for one dir up.
 
-# Note that these actually #include everything they need, except ccan/.
-# That allows for unit testing of statics, and special effects.
+BITCOIN_SRC :=					\
+	bitcoin/base58.c			\
+	bitcoin/block.c				\
+	bitcoin/chainparams.c			\
+	bitcoin/locktime.c			\
+	bitcoin/pubkey.c			\
+	bitcoin/pullpush.c			\
+	bitcoin/script.c			\
+	bitcoin/shadouble.c			\
+	bitcoin/short_channel_id.c		\
+	bitcoin/signature.c			\
+	bitcoin/tx.c				\
+	bitcoin/varint.c
 
-BITCOIN_TEST_SRC := $(wildcard bitcoin/test/run-*.c)
-BITCOIN_TEST_OBJS := $(BITCOIN_TEST_SRC:.c=.o)
-BITCOIN_TEST_PROGRAMS := $(BITCOIN_TEST_OBJS:.o=)
+BITCOIN_OBJS := $(BITCOIN_SRC:.c=.o)
 
-$(BITCOIN_TEST_PROGRAMS): $(CCAN_OBJS)
+BITCOIN_HEADERS := bitcoin/address.h		\
+	bitcoin/base58.h			\
+	bitcoin/block.h				\
+	bitcoin/chainparams.h			\
+	bitcoin/feerate.h			\
+	bitcoin/locktime.h			\
+	bitcoin/preimage.h			\
+	bitcoin/privkey.h			\
+	bitcoin/pubkey.h			\
+	bitcoin/pullpush.h			\
+	bitcoin/script.h			\
+	bitcoin/shadouble.h			\
+	bitcoin/short_channel_id.h		\
+	bitcoin/signature.h			\
+	bitcoin/tx.h				\
+	bitcoin/varint.h
 
-$(BITCOIN_TEST_OBJS): $(CCAN_HEADERS) $(BITCOIN_HEADERS) $(BITCOIN_SRC)
+check-source: $(BITCOIN_SRC:%=check-src-include-order/%)		\
+	$(BITCOIN_HEADERS:%=check-hdr-include-order/%)
 
-check: bitcoin-tests
+# Bitcoin objects depends on bitcoin/ external/ and ccan
+$(BITCOIN_OBJS): $(CCAN_HEADERS) $(BITCOIN_HEADERS) $(EXTERNAL_HEADERS)
 
 check-source-bolt: $(BITCOIN_SRC:%=bolt-check/%) $(BITCOIN_HEADERS:%=bolt-check/%)
 
+check-makefile: check-bitcoin-makefile
+
+check-bitcoin-makefile:
+	@if [ "`echo bitcoin/*.h`" != "$(BITCOIN_HEADERS)" ]; then echo BITCOIN_HEADERS incorrect; exit 1; fi
+
 check-whitespace: $(BITCOIN_SRC:%=check-whitespace/%) $(BITCOIN_HEADERS:%=check-whitespace/%) check-whitespace/bitcoin/Makefile
 
-bitcoin-tests: $(BITCOIN_TEST_PROGRAMS:%=unittest/%)
+clean: bitcoin-clean
 
-LIBBASE58_HEADERS := bitcoin/libbase58/libbase58.h
+bitcoin-clean:
+	$(RM) $(BITCOIN_OBJS) $(BITCOIN_TEST_PROGRAMS) $(BITCOIN_TEST_OBJS)
 
-LIBBASE58_SRC := bitcoin/libbase58/base58.c
-
-# Can't be inside submodule, as that makes git think it's dirty.
-LIBBASE58_OBJS := bitcoin/libbase58.o
-
-# Git submodules are seriously broken.
-bitcoin/libbase58/libbase58.h:
-	git submodule update bitcoin/libbase58/
-	[ -f $@ ] || git submodule update --init bitcoin/libbase58/
-
-# If we tell Make that the above builds both, it runs it twice in
-# parallel.  So we lie :(
-bitcoin/libbase58/base58.c: bitcoin/libbase58/libbase58.h
-	[ -f $@ ]
-
-bitcoin/libbase58.o: bitcoin/libbase58/base58.c
-	$(COMPILE.c) $(OUTPUT_OPTION) $<
+include bitcoin/test/Makefile
